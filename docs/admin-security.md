@@ -6,7 +6,7 @@ All human administrators must verify an authenticator code after primary sign-in
 
 Sign in again if the primary session is more than 15 minutes old, then open `/security`. Confirm the current account password, scan the locally generated QR code in an authenticator app, save the ten recovery codes privately, and verify a current six-digit code. The setup key and codes are displayed only during enrollment and should not be pasted into support messages or screenshots.
 
-Verification is tied to the specific session and lasts at most 12 hours, bounded by the session expiry. A newly signed-in browser needs a new proof. An old session is not trusted just because the account subsequently enrolled. Administrators cannot disable MFA through the normal authentication API. Verification has a persistent per-account attempt budget and replay protection. Recovery codes are single-use.
+Verification is tied to the specific session and lasts at most 12 hours, bounded by the session expiry. A newly signed-in browser needs a new proof. An old session is not trusted just because the account subsequently enrolled. Administrators cannot disable MFA through the normal authentication API. Verification has a persistent per-account attempt budget and replay protection. Recovery codes are single-use. Fingerprints of consumed recovery codes remain until the account is deleted, so routine diagnostic cleanup cannot make a used code valid again.
 
 ## Recovery and incident response
 

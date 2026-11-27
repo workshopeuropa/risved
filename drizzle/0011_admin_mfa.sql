@@ -14,7 +14,7 @@ CREATE TABLE admin_mfa_sessions (
 );
 --> statement-breakpoint
 CREATE TABLE admin_mfa_codes (
-  user_id text NOT NULL,code_hash text NOT NULL,expires_at integer NOT NULL,
+  user_id text NOT NULL REFERENCES user(id) ON DELETE CASCADE,code_hash text NOT NULL,expires_at integer NOT NULL,
   PRIMARY KEY(user_id,code_hash)
 );
 --> statement-breakpoint

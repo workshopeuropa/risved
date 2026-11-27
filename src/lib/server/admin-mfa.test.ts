@@ -37,6 +37,7 @@ it('binds second-factor verification to one session, rejects replay and expires 
   expect(await adminMfaVerified('admin','session-new',now+12*3600000)).toBe(false)
   await confirmAdminMfa(session,'fixture-recovery-code',true,now+2)
   expect(await confirmAdminMfa(session,'fixture-recovery-code',true,now+3)).toBe(false)
+  expect(await confirmAdminMfa(session,'fixture-recovery-code',true,now+86400000)).toBe(false)
   const logs=await db.all<{event:string}>(sql`SELECT event FROM admin_security_log`)
   expect(logs.map(row=>row.event)).toEqual(['mfa_totp_verified','mfa_recovery_verified'])
   expect(JSON.stringify(await db.all(sql`SELECT * FROM admin_mfa_codes`))).not.toContain('fixture-recovery-code')

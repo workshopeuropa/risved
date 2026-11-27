@@ -29,12 +29,12 @@ export async function takeMfaAttempt(userId:string,now=Date.now()) {
 /** Bind successful verification to its session and reject replayed TOTP codes. */
 export async function confirmAdminMfa(session:{id:string,userId:string,expiresAt:Date},code:string,recovery:boolean,now=Date.now()) {
   return db.transaction(async tx=> {
-    await tx.run(sql`DELETE FROM admin_mfa_codes WHERE expires_at<=${now}`)
+    await tx.run(sql`DELETE FROM admin_mfa_codes WHERE expires_at<=${now} OR NOT EXISTS (SELECT 1 FROM "user" WHERE "user".id=admin_mfa_codes.user_id)`)
     {
       if (!env.BETTER_AUTH_SECRET) throw new Error('BETTER_AUTH_SECRET must be configured')
       const digest = createHmac('sha256',env.BETTER_AUTH_SECRET).update(`${session.userId}:${recovery ? 'recovery' : 'totp'}:${code}`).digest('hex')
       if ((await tx.all(sql`SELECT 1 FROM admin_mfa_codes WHERE user_id=${session.userId} AND code_hash=${digest}`)).length) return false
-      await tx.run(sql`INSERT INTO admin_mfa_codes VALUES (${session.userId},${digest},${now+90000})`)
+      await tx.run(sql`INSERT INTO admin_mfa_codes VALUES (${session.userId},${digest},${recovery ? Number.MAX_SAFE_INTEGER : now+90000})`)
     }
     await tx.run(sql`INSERT INTO admin_mfa_sessions VALUES (${session.id},${session.userId},${now},${Math.min(new Date(session.expiresAt).getTime(),now+lifetime)}) ON CONFLICT(session_id) DO UPDATE SET verified_at=excluded.verified_at,expires_at=excluded.expires_at`)
     await tx.run(sql`INSERT INTO admin_security_log VALUES (${crypto.randomUUID()},${now},${recovery ? 'mfa_recovery_verified' : 'mfa_totp_verified'},${session.userId})`)
@@ -47,6 +47,6 @@ export async function cleanMfaSecurityLogs(days:number,now=Date.now()) {
   const cutoff=now-days*86400000
   await db.run(sql`DELETE FROM admin_security_log WHERE recorded_at<${cutoff}`)
   await db.run(sql`DELETE FROM admin_mfa_sessions WHERE expires_at<=${now}`)
-  await db.run(sql`DELETE FROM admin_mfa_codes WHERE expires_at<=${now}`)
+  await db.run(sql`DELETE FROM admin_mfa_codes WHERE expires_at<=${now} OR NOT EXISTS (SELECT 1 FROM "user" WHERE "user".id=admin_mfa_codes.user_id)`)
   await db.run(sql`DELETE FROM admin_mfa_limits WHERE available_at<${cutoff}`)
 }
