@@ -6,7 +6,7 @@ import { isFirstRun } from './auth-utils'
 
 const challengePaths = ['/sign-in/email-otp','/passkey/verify-authentication']
 const verificationPaths = ['/two-factor/verify-totp','/two-factor/verify-backup-code']
-const sensitivePaths = ['/change-email','/change-password','/set-password','/update-user','/delete-user','/link-social','/unlink-account','/revoke-sessions','/two-factor/get-totp-uri','/two-factor/generate-backup-codes','/two-factor/view-backup-codes','/passkey/generate-register-options','/passkey/verify-registration','/passkey/delete-passkey','/passkey/update-passkey']
+const sensitivePaths = ['/change-email','/change-password','/set-password','/update-user','/delete-user','/link-social','/unlink-account','/revoke-sessions','/list-sessions','/revoke-session','/revoke-other-sessions','/list-accounts','/get-access-token','/refresh-token','/email-otp/request-email-change','/email-otp/change-email','/two-factor/get-totp-uri','/two-factor/generate-backup-codes','/two-factor/view-backup-codes','/passkey/generate-register-options','/passkey/verify-registration','/passkey/delete-passkey','/passkey/update-passkey','/oauth2/authorize','/oauth2/consent']
 
 /** Reuse the native second-factor challenge for passkey sign-ins too. */
 export function administratorTwoFactor() {
@@ -23,6 +23,7 @@ export function administratorAuthHooks() {
   return {
     before:createAuthMiddleware(async ctx => {
       const path = ctx.path || ''
+      if (path === '/mcp/authorize' && ctx.query) ctx.query.prompt = 'consent'
       if (path === '/sign-up/email' && !await isFirstRun()) throw new APIError('FORBIDDEN',{message:'Administrator registration is closed after initial setup.',code:'ADMIN_REGISTRATION_CLOSED'})
       if (!path.startsWith('/admin/') && !path.startsWith('/two-factor/') && !sensitivePaths.includes(path) && path !== '/mcp/authorize') return
       const session = await getSessionFromCtx(ctx)

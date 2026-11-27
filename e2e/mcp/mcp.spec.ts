@@ -33,8 +33,11 @@ test.beforeAll(async ({ request }) => {
 		"INSERT OR REPLACE INTO settings(key,value) VALUES ('onboarding_complete','true')"
 	)
 	db.close()
-	const duplicate = await request.post('/api/auth/sign-up/email',{data:{name:'Uninvited',email:'uninvited@example.test',password:'uninvited-password-123'}})
+	const duplicate = await request.post('/api/auth/sign-up/email',{headers:{Origin:'http://localhost:5188'},data:{name:'Uninvited',email:'uninvited@example.test',password:'uninvited-password-123'}})
 	expect(duplicate.status()).toBe(403)
+	expect((await duplicate.json()).code).toBe('ADMIN_REGISTRATION_CLOSED')
+	expect((await request.get('/api/auth/list-sessions')).status()).toBe(403)
+	expect((await request.post('/api/auth/oauth2/consent',{headers:{Origin:'http://localhost:5188'},data:{accept:true,consent_code:'invalid'}})).status()).toBe(403)
 	const enabled = await request.post('/api/auth/two-factor/enable', {
 		headers: { Origin: 'http://localhost:5188' },
 		data: { password: 'mcp-e2e-password-123' }

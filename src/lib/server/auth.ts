@@ -2,7 +2,6 @@ import { betterAuth } from 'better-auth/minimal'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { sveltekitCookies } from 'better-auth/svelte-kit'
 import { passkey } from '@better-auth/passkey'
-import { createAuthMiddleware } from 'better-auth/api'
 import { mcp } from 'better-auth/plugins'
 import { env } from '$env/dynamic/private'
 import { getRequestEvent } from '$app/server'
@@ -26,10 +25,7 @@ export const auth = betterAuth({
 		autoSignIn: true
 	},
 	hooks: {
-		before: createAuthMiddleware(async (ctx) => {
-			if (ctx.path === '/mcp/authorize' && ctx.query) ctx.query.prompt = 'consent'
-			return mfaHooks.before(ctx)
-		}),
+		before:mfaHooks.before,
 		after:mfaHooks.after
 	},
 	plugins: [
