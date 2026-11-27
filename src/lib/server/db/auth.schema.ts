@@ -7,6 +7,7 @@ export const user = sqliteTable('user', {
 	email: text('email').notNull().unique(),
 	emailVerified: integer('email_verified', { mode: 'boolean' }).default(false).notNull(),
 	image: text('image'),
+	twoFactorEnabled: integer('two_factor_enabled', { mode: 'boolean' }).default(false),
 	createdAt: integer('created_at', { mode: 'timestamp_ms' })
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 		.notNull(),
@@ -232,3 +233,11 @@ export const oauthConsentRelations = relations(oauthConsent, ({ one }) => ({
 		references: [user.id]
 	})
 }));
+
+
+export const twoFactor = sqliteTable('two_factor', {
+  id:text('id').primaryKey(),
+  secret:text('secret').notNull(),
+  backupCodes:text('backup_codes').notNull(),
+  userId:text('user_id').notNull().references(()=>user.id,{onDelete:'cascade'})
+},table=>[index('two_factor_user_idx').on(table.userId)])

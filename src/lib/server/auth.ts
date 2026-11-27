@@ -7,6 +7,9 @@ import { mcp } from 'better-auth/plugins'
 import { env } from '$env/dynamic/private'
 import { getRequestEvent } from '$app/server'
 import { db } from '$lib/server/db'
+import { administratorTwoFactor, administratorAuthHooks } from './admin-mfa'
+
+const mfaHooks = administratorAuthHooks()
 
 export const auth = betterAuth({
 	baseURL: env.ORIGIN || undefined,
@@ -25,10 +28,13 @@ export const auth = betterAuth({
 	hooks: {
 		before: createAuthMiddleware(async (ctx) => {
 			if (ctx.path === '/mcp/authorize' && ctx.query) ctx.query.prompt = 'consent'
-		})
+			return mfaHooks.before(ctx)
+		}),
+		after:mfaHooks.after
 	},
 	plugins: [
 		passkey(),
+		administratorTwoFactor(),
 		/*
 		 * OAuth 2.1 authorization server for MCP clients. Agents that support
 		 * remote MCP (Claude Code, Codex) discover it at

@@ -1,5 +1,6 @@
 import { withDockerPrune } from '../docker-resource-lock'
 import { db } from '$lib/server/db'
+import { cleanMfaSecurityLogs } from '$lib/server/admin-mfa-store'
 import { deployments, buildLogs, cronRuns, projects } from '$lib/server/db/schema'
 import { inArray, isNotNull, lt } from 'drizzle-orm'
 import { getSetting } from '$lib/server/settings'
@@ -181,6 +182,7 @@ export class CleanupManager {
 
 			/* Always clean up old cron runs regardless of deployments */
 			await db.delete(cronRuns).where(lt(cronRuns.startedAt, cutoffISO))
+            await cleanMfaSecurityLogs(validDays)
 
 			if (oldDeployments.length === 0) {
 				return { deploymentsRemoved: 0, buildLogsRemoved: 0, cutoffDate: cutoffISO }

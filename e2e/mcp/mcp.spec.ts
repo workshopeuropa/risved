@@ -3,10 +3,13 @@ import { createClient } from '@libsql/client'
 import { createServer } from 'node:http'
 import { createHash, randomBytes } from 'node:crypto'
 import { McpPage } from './mcp-page'
+import { base32 } from '@better-auth/utils/base32'
+import { createOTP } from '@better-auth/utils/otp'
 import packageJson from '../../package.json' with { type: 'json' }
 
 const headers = { Accept: 'application/json, text/event-stream' }
 let callback = ''
+let recoveryCodes: string[] = []
 const callbackServer = createServer((_request, response) => response.end('Connection complete'))
 
 /** Send an authenticated stateless MCP request. */
@@ -30,6 +33,22 @@ test.beforeAll(async ({ request }) => {
 		"INSERT OR REPLACE INTO settings(key,value) VALUES ('onboarding_complete','true')"
 	)
 	db.close()
+	const duplicate = await request.post('/api/auth/sign-up/email',{data:{name:'Uninvited',email:'uninvited@example.test',password:'uninvited-password-123'}})
+	expect(duplicate.status()).toBe(403)
+	const enabled = await request.post('/api/auth/two-factor/enable', {
+		headers: { Origin: 'http://localhost:5188' },
+		data: { password: 'mcp-e2e-password-123' }
+	})
+	expect(enabled.ok(), await enabled.text()).toBeTruthy()
+	const setup = await enabled.json()
+	recoveryCodes = setup.backupCodes
+	const encoded = new URL(setup.totpURI).searchParams.get('secret')!
+	const secret = new TextDecoder().decode(base32.decode(encoded))
+	const verified = await request.post('/api/auth/two-factor/verify-totp', {
+		headers: { Origin: 'http://localhost:5188' },
+		data: { code: await createOTP(secret).totp() }
+	})
+	expect(verified.ok(), await verified.text()).toBeTruthy()
 })
 
 test.afterAll(async () => {
@@ -43,7 +62,9 @@ test('creates a key, completes a handshake, hides the key after reload and revok
 	const ui = new McpPage(page)
 	const errors: string[] = []
 	page.on('pageerror', error => errors.push(error.message))
-	await ui.signIn()
+	await ui.signIn(recoveryCodes[0])
+	await page.goto('/security?next='+encodeURIComponent('/\n/attacker.example'))
+	await expect(page.getByRole('link',{name:'Continue to admin',exact:true})).toHaveAttribute('href','/')
 	const key = await ui.createKey()
 	const init = await rpc(request, key, 'initialize', {
 		protocolVersion: '2025-06-18',
@@ -107,6 +128,7 @@ test('discovers OAuth, requires approval, exchanges an S256 code and rejects cod
 	await page.getByLabel('Email', { exact: true }).fill('mcp-e2e@example.test')
 	await page.getByLabel('Password', { exact: true }).fill('mcp-e2e-password-123')
 	await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+	await new McpPage(page).verifyMfa(recoveryCodes[1])
 	await expect(page.getByRole('heading', { name: 'Connect Release verification?' })).toBeVisible()
 	await page.screenshot({ path: testInfo.outputPath('mcp-consent.png') })
 	await page.getByRole('button', { name: 'Allow access', exact: true }).click()
@@ -149,4 +171,26 @@ test('discovers OAuth, requires approval, exchanges an S256 code and rejects cod
 	params.delete('code_challenge_method')
 	await page.goto(metadata.authorization_endpoint + '?' + params)
 	await expect(page).toHaveURL(/error=invalid_request/)
+})
+
+test('requires MFA after a passkey sign-in before opening the dashboard',async({page,context})=> {
+  const ui=new McpPage(page)
+  await ui.signIn(recoveryCodes[2])
+  const cdp=await context.newCDPSession(page)
+  await cdp.send('WebAuthn.enable')
+  await cdp.send('WebAuthn.addVirtualAuthenticator',{options:{protocol:'ctap2',transport:'internal',hasResidentKey:true,hasUserVerification:true,isUserVerified:true,automaticPresenceSimulation:true}})
+  await page.goto('/settings')
+  await page.getByTestId('passkey-name-input').fill('Isolated MFA passkey')
+  await page.getByTestId('register-passkey-btn').click()
+  await expect(page.getByText('Passkey registered',{exact:true})).toBeVisible()
+  await page.request.post('/api/auth/sign-out',{headers:{Origin:'http://localhost:5188'}})
+  await page.goto('/login')
+  await page.getByRole('button',{name:'Sign in with passkey',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Verify your identity',exact:true})).toBeVisible()
+  expect((await page.request.get('/api/auth/get-session')).status()).toBe(200)
+  const primary=await page.request.get('/api/auth/get-session')
+  expect(await primary.json()).toBeNull()
+  await ui.verifyMfa(recoveryCodes[3])
+  await expect(page).toHaveURL(/\/projects$/)
+  await cdp.detach()
 })

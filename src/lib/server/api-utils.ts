@@ -12,6 +12,7 @@ export async function requireAuth(
 	event: RequestEvent
 ): Promise<NonNullable<App.Locals['user']>> {
 	if (event.locals.user) {
+        if (event.locals.session && !event.locals.adminMfaVerified) error(403,'Verify your authenticator to continue')
 		return event.locals.user;
 	}
 

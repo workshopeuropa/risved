@@ -21,8 +21,8 @@ export function _resolvePostLogin(url: URL): string {
 }
 
 export const load = (async (event) => {
-	if (event.locals.user) {
-		redirect(302, _resolvePostLogin(event.url))
+	if (event.locals.user && !event.url.searchParams.has('reauth')) {
+		redirect(303,`/security?next=${encodeURIComponent(_resolvePostLogin(event.url))}`)
 	}
 
 	const [projectCount] = await db.select({ count: count() }).from(projects)
@@ -47,15 +47,16 @@ export const actions: Actions = {
 
 		try {
 			await auth.api.signInEmail({
-				body: { email, password }
-			})
+                body:{email,password},headers:event.request.headers
+            })
 		} catch (error) {
+            if (error && typeof error === 'object' && 'status' in error && error.status === 303) throw error
 			if (error instanceof APIError) {
 				return fail(400, { email, error: error.message || 'Invalid email or password' })
 			}
 			return fail(500, { email, error: 'An unexpected error occurred' })
 		}
 
-		redirect(302, _resolvePostLogin(event.url))
+		redirect(303,`/security?next=${encodeURIComponent(_resolvePostLogin(event.url))}`)
 	}
 }

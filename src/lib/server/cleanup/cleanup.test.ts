@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+vi.mock('$lib/server/admin-mfa-store', () => ({cleanMfaSecurityLogs:vi.fn().mockResolvedValue(undefined)}))
+
 /* ── Mocks ────────────────────────────────────────────────────────── */
 
 /* Never let these tests reach the real Docker daemon on a developer machine */

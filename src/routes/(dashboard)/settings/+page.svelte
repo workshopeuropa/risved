@@ -362,6 +362,12 @@
 		<h1>Settings</h1>
 	</header>
 
+	<section class="section">
+        <h2 class="section-title">Administrator security</h2>
+        <p class="card-desc">An authenticator code is required for administrator sessions.</p>
+        <a href={resolve('/security')} class="btn-secondary btn-lg">Manage authenticator</a>
+    </section>
+
 	<!-- Git -->
 	<section class="section" data-testid="git-section">
 		<h2 class="section-title">Git</h2>

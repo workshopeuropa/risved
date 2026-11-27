@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms'
-	import { goto } from '$app/navigation'
 	import { resolve } from '$app/paths'
 	import { authClient } from '$lib/auth-client'
 	import type { ActionData, PageData } from './$types'
@@ -18,12 +17,8 @@
 			await authClient.signIn.passkey({
 				fetchOptions: {
 					onSuccess() {
-						/* A full load, not goto: the OAuth continuation is a server route. */
-						if (data.postLogin !== '/') {
-							window.location.href = data.postLogin
-							return
-						}
-						goto(resolve('/'))
+						/* Verify MFA before returning to dashboard or OAuth continuation. */
+						window.location.assign(`${resolve('/security')}?next=${encodeURIComponent(data.postLogin)}`)
 					},
 					onError(ctx) {
 						passkeyError = ctx.error?.message || 'Passkey authentication failed'

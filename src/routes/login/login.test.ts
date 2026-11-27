@@ -60,8 +60,8 @@ describe('login load', () => {
 
 	it('redirects to / if already logged in', async () => {
 		await expect(load(makeLoadEvent({ id: '1', email: 'a@b.com' }))).rejects.toMatchObject({
-			status: 302,
-			location: '/'
+			status: 303,
+			location: '/security?next=%2F'
 		})
 	})
 
@@ -74,8 +74,8 @@ describe('login load', () => {
 	it('sends a signed-in user back to the MCP authorize endpoint', async () => {
 		const search = '?client_id=abc&redirect_uri=http%3A%2F%2Flocalhost%2Fcb&state=xyz'
 		await expect(load(makeLoadEvent({ id: '1', email: 'a@b.com' }, search))).rejects.toMatchObject({
-			status: 302,
-			location: expect.stringContaining('/api/auth/mcp/authorize?')
+			status: 303,
+			location: expect.stringContaining('/security?next=%2Fapi%2Fauth%2Fmcp%2Fauthorize%3F')
 		})
 	})
 
@@ -111,7 +111,7 @@ describe('login action', () => {
 	it('signs in and redirects on success', async () => {
 		await expect(
 			actions.default(makeActionEvent({ email: 'a@b.com', password: 'validpassword1' }))
-		).rejects.toMatchObject({ status: 302, location: '/' })
+		).rejects.toMatchObject({ status: 303, location: '/security?next=%2F' })
 
 		expect(auth.api.signInEmail).toHaveBeenCalledWith(
 			expect.objectContaining({

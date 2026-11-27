@@ -1,7 +1,8 @@
 import { handleFormOrigin } from '$lib/server/mcp/form-origin'
 import { sequence } from '@sveltejs/kit/hooks';
 import { building } from '$app/environment';
-import { redirect } from '@sveltejs/kit';
+import { redirect, error } from '@sveltejs/kit'
+import { adminMfaVerified } from '$lib/server/admin-mfa'
 import { auth } from '$lib/server/auth';
 import { isFirstRun } from '$lib/server/auth-utils';
 import { isOnboardingComplete, getOnboardingResumePath } from '$lib/server/settings';
@@ -52,7 +53,7 @@ if (!building) {
 	process.on('SIGTERM', shutdown)
 }
 
-const PUBLIC_PATHS = ['/onboarding', '/login', '/api/auth', '/api/webhooks', '/api/git', '/mcp', '/.well-known'];
+const PUBLIC_PATHS = ['/onboarding', '/login', '/security', '/api/auth', '/api/webhooks', '/api/git', '/mcp', '/.well-known'];
 
 function isPublicPath(pathname: string): boolean {
 	return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
@@ -75,7 +76,8 @@ const handleBetterAuth: Handle = async ({ event, resolve }) => {
 
 	if (session) {
 		event.locals.session = session.session;
-		event.locals.user = session.user;
+		event.locals.user = session.user
+        event.locals.adminMfaVerified = Boolean(session.user.twoFactorEnabled && await adminMfaVerified(session.user.id,session.session.id))
 	}
 
 	return svelteKitHandler({ event, resolve, auth, building });
@@ -101,6 +103,13 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 		return resolve(event)
 	}
 
+	if (pathname.startsWith('/onboarding') && !event.locals.user) redirect(303,'/login')
+
+	if (event.locals.user && !event.locals.adminMfaVerified && (!isPublicPath(pathname) || pathname.startsWith('/onboarding'))) {
+        if (pathname.startsWith('/api/') || !['GET','HEAD'].includes(event.request.method)) error(403,'Verify your authenticator to continue')
+        redirect(303,`/security?next=${encodeURIComponent(pathname+event.url.search)}`)
+    }
+
 	if (!onboardingDone && !isPublicPath(pathname)) {
 		redirect(303, await getOnboardingResumePath())
 	}
@@ -113,7 +122,7 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 		redirect(303, '/login');
 	}
 
-	return resolve(event);
-};
+    return resolve(event)
+}
 
 export const handle: Handle = sequence(handleFormOrigin, handleParaglide, handleBetterAuth, handleAuth);

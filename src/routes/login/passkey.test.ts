@@ -21,7 +21,7 @@ describe('Passkey Authentication', () => {
 	it('auth client includes passkey plugin', async () => {
 		const { authClient } = await import('$lib/auth-client');
 		const client = authClient as unknown as { _plugins: { id: string }[] };
-		expect(client._plugins).toHaveLength(1);
+		expect(client._plugins.map(plugin=>plugin.id)).toContain('two-factor');
 		expect(client._plugins[0].id).toBe('passkey-client');
 	});
 
